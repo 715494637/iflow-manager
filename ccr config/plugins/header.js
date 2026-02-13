@@ -25,6 +25,7 @@ class HeaderTransformer {
             body: request,
             config: {
                 headers: {
+                    "authorization": `Bearer ${currentApiKey}`,
                     "user-agent": userAgent,
                     "session-id": sessionId,
                     "conversation-id": "",
