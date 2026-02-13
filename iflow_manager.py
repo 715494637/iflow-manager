@@ -3,14 +3,21 @@
 iFlow 账号管理工具 - 交互式终端版
 """
 
+import io
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 from colorama import init, Fore, Style
+
+# 修复 Windows 控制台编码问题
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 init(autoreset=True)
 
@@ -93,7 +100,32 @@ def get_config_path():
 
 
 def get_ccr_config_path():
+    """获取 CCR 配置目录"""
     return Path.home() / ".claude-code-router" / "config.json"
+
+
+def get_ccr_plugins_path():
+    """获取 CCR plugins 目录"""
+    return Path.home() / ".claude-code-router" / "plugins"
+
+
+def get_ccr_status():
+    """获取 CCR 文件状态"""
+    paths = get_cross_platform_paths()
+    system = platform.system()
+    system_name = {"Windows": "Windows", "Darwin": "macOS", "Linux": "Linux"}.get(system, system)
+
+    config_path = Path(paths["config_json"])
+    header_path = Path(paths["header_js"])
+
+    return {
+        "system": system_name,
+        "base_path": paths["base"],
+        "config_exists": config_path.exists(),
+        "config_path": str(config_path),
+        "header_exists": header_path.exists(),
+        "header_path": str(header_path),
+    }
 
 
 def load_accounts():
@@ -297,6 +329,104 @@ def update_ccr_config_and_restart():
         return False
 
 
+def get_cross_platform_paths():
+    """获取跨平台的 CCR 路径"""
+    system = platform.system()  # 'Windows', 'Darwin', 'Linux'
+    username = os.getlogin()
+
+    if system == 'Windows':
+        base_path = f"C:/Users/{username}/.claude-code-router"
+    elif system == 'Darwin':  # Mac
+        base_path = f"/Users/{username}/.claude-code-router"
+    else:  # Linux
+        base_path = f"/home/{username}/.claude-code-router"
+
+    return {
+        "base": base_path,
+        "plugins": f"{base_path}/plugins",
+        "header_js": f"{base_path}/plugins/header.js",
+        "config_json": f"{base_path}/config.json",
+    }
+
+
+def init_ccr_config():
+    """初始化 CCR 配置"""
+    import requests
+
+    paths = get_cross_platform_paths()
+    print(f"{C.WHITE}[DEBUG] 系统: {platform.system()}{R}")
+    print(f"{C.WHITE}[DEBUG] 用户名: {os.getlogin()}{R}")
+    print(f"{C.WHITE}[DEBUG] CCR 基础路径: {paths['base']}{R}")
+
+    # 1. 创建 plugins 目录
+    plugins_dir = Path(paths["plugins"])
+    if not plugins_dir.exists():
+        print(f"{C.CYAN}创建 plugins 目录...{R}")
+        plugins_dir.mkdir(parents=True, exist_ok=True)
+
+    # 2. 从 GitHub 获取 header.js
+    header_js_url = "https://raw.githubusercontent.com/715494637/iflow-manager/refs/heads/master/ccr%20config/plugins/header.js"
+    print(f"{C.CYAN}下载 header.js...{R}")
+    try:
+        response = requests.get(header_js_url, timeout=30)
+        if response.status_code == 200:
+            header_js_path = Path(paths["header_js"])
+            with open(header_js_path, "w", encoding="utf-8") as f:
+                f.write(response.text)
+            print(f"{C.GREEN}✅ header.js 已保存{R}")
+        else:
+            print(f"{C.RED}❌ 下载 header.js 失败: {response.status_code}{R}")
+            return False
+    except Exception as e:
+        print(f"{C.RED}❌ 下载 header.js 错误: {e}{R}")
+        return False
+
+    # 3. 从 GitHub 获取 config.json 模板
+    config_json_url = "https://raw.githubusercontent.com/715494637/iflow-manager/refs/heads/master/ccr%20config/config.json"
+    print(f"{C.CYAN}下载 config.json 模板...{R}")
+    try:
+        response = requests.get(config_json_url, timeout=30)
+        if response.status_code == 200:
+            config_template = response.json()
+
+            # 4. 修改 path 中的用户路径
+            username = os.getlogin()
+            for transformer in config_template.get("transformers", []):
+                if "path" in transformer:
+                    transformer["path"] = transformer["path"].replace("dypbi", username)
+
+            # 5. 如有账号则添加 api_key，否则设为占位符
+            accounts_data = load_accounts()
+            accounts = accounts_data.get("accounts", [])
+
+            api_keys = ",".join([acc.get("apiKey", "") for acc in accounts if acc.get("apiKey")])
+            if not api_keys:
+                api_keys = "YOUR_API_KEY_HERE"
+                print(f"{C.YELLOW}⚠️ 没有账号，api_key 设为占位符{R}")
+            else:
+                print(f"{C.GREEN}✅ 找到 {len(accounts)} 个账号{R}")
+
+            # 更新 provider 配置
+            for provider in config_template.get("Providers", []):
+                if provider.get("name") == "op-provider":
+                    provider["api_key"] = api_keys
+                    break
+
+            # 6. 写入配置文件
+            config_path = Path(paths["config_json"])
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config_template, f, ensure_ascii=False, indent=2)
+
+            print(f"{C.GREEN}✅ CCR 配置已初始化: {config_path}{R}")
+            return True
+        else:
+            print(f"{C.RED}❌ 下载 config.json 失败: {response.status_code}{R}")
+            return False
+    except Exception as e:
+        print(f"{C.RED}❌ 初始化 CCR 配置错误: {e}{R}")
+        return False
+
+
 def show_accounts(accounts):
     if not accounts:
         print(f"{C.YELLOW}暂无账号{R}")
@@ -476,24 +606,35 @@ def main():
         print_header("📋 iFlow 账号管理")
         expired, expiring = show_accounts(accounts)
 
+        # 显示 CCR 状态（简洁版）
+        ccr_status = get_ccr_status()
+        config_status = f"{C.GREEN}OK{R}" if ccr_status['config_exists'] else f"{C.RED}X{R}"
+        header_status = f"{C.GREEN}OK{R}" if ccr_status['header_exists'] else f"{C.RED}X{R}"
+
+        print(f"\n{B}{C.CYAN}[ CCR Status ]{R}")
+        print(f"  {B}Platform{R}: {ccr_status['system']}")
+        print(f"  {B}Config {config_status}{R} | {B}Header {header_status}{R}")
+        print(f"  {B}Path{R}: {ccr_status['base_path']}")
+
         # 操作菜单
         print(f"\n{B}请选择操作:{R}")
         print_menu({
             "1": "➕ 添加账号",
-            "2": "🔄 智能更新账号",
-            "3": "⚡ 强制更新全部账号",
+            "2": "🔄 智能续期",
+            "3": "⚡ 全部续期",
         })
         if accounts:
             print_menu({
                 "4": "🗑️ 删除账号",
             })
         print_menu({
-            "5": "⚙️ 手动更新CCR配置",
-            "6": "🚪 退出",
+            "5": "⚙️ 更新CCR配置",
+            "6": "🔧 初始化CCR配置",
+            "7": "🚪 退出",
         })
 
-        choices = ["1", "2", "3", "5", "6"] if not accounts else ["1", "2", "3", "4", "5", "6"]
-        choice = input_choice("\n请输入选项", choices)
+        choices = ["1", "2", "3", "5", "6", "7"] if not accounts else ["1", "2", "3", "4", "5", "6", "7"]
+        choice = input_choice("\n请输入选项：", choices)
 
         if choice == "1":
             # 添加账号
@@ -548,6 +689,13 @@ def main():
             update_ccr_config_and_restart()
 
         elif choice == "6":
+            print(f"\n{C.CYAN}初始化 CCR 配置...{R}")
+            if init_ccr_config():
+                print(f"{C.GREEN}✅ CCR 初始化完成{R}")
+            else:
+                print(f"{C.RED}❌ CCR 初始化失败{R}")
+
+        elif choice == "7":
             print(f"{C.CYAN}再见喵～ 🐱{R}")
             break
 
