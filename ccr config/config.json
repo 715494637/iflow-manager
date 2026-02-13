@@ -10,7 +10,7 @@
   "transformers": [
     {
       "name": "header",
-      "path": "C:\\Users\\dypbi\\.claude-code-router\\plugins\\header.js",
+      "path": "C:/Users/dypbi/.claude-code-router/plugins/header.js",
       "options": {}
     }
   ],
