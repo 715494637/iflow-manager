@@ -1,0 +1,51 @@
+const crypto = require('crypto');
+let count = 0
+
+class HeaderTransformer {
+    name = "header";
+   
+    async transformRequestIn(request, provider) {
+        count++;
+        const apiKey = provider.apiKey;
+        
+        const userAgent = "iFlow-Cli";
+        const sessionId = this.generateSessionId();
+        const timestamp = Date.now(); 
+        const signature = this.generateSignature(userAgent, sessionId, timestamp, apiKey);
+        this.logger?.debug("当前请求次数："+count)
+
+        return {
+            body: request,
+            config: {
+                headers: {
+                    "user-agent": userAgent,
+                    "session-id": sessionId,
+                    "conversation-id": "", // 可选
+                    "x-iflow-timestamp": timestamp.toString(),
+                    "x-iflow-signature": signature
+                },
+            },
+        };
+    }
+
+
+    generateSignature(userAgent, sessionId, timestamp, apiKey) {
+        if (!apiKey) return null;
+        const message = `${userAgent}:${sessionId}:${timestamp}`;
+        return crypto
+            .createHmac('sha256', apiKey)
+            .update(message, 'utf8')
+            .digest('hex');
+    }
+
+
+    generateSessionId() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+}
+
+module.exports = HeaderTransformer;

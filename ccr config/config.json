@@ -1,0 +1,45 @@
+{
+  "LOG": true,
+  "LOG_LEVEL": "debug",
+  "CLAUDE_PATH": "",
+  "HOST": "127.0.0.1",
+  "PORT": 3456,
+  "APIKEY": "sk-zcf-x-ccr",
+  "API_TIMEOUT_MS": "600000",
+  "PROXY_URL": "",
+  "transformers": [
+    {
+      "name": "header",
+      "path": "C:\\Users\\dypbi\\.claude-code-router\\plugins\\header.js",
+      "options": {}
+    }
+  ],
+  "Providers": [
+    {
+      "name": "op-provider",
+      "api_base_url": "https://apis.iflow.cn/v1/chat/completions",
+      "api_key": "sk-xxxx",
+      "models": [
+        "qwen3-vl-plus",
+        "minimax-m2.1",
+        "kimi-k2.5",
+        "glm-5",
+        "minimax-m2.5"
+      ],
+      "transformer": {
+        "use": [
+          "header"
+        ]
+      }
+    }
+  ],
+  "Router": {
+    "default": "op-provider,minimax-m2.5",
+    "background": "op-provider,minimax-m2.5",
+    "think": "op-provider,minimax-m2.5",
+    "longContext": "op-provider,minimax-m2.5",
+    "longContextThreshold": 200000,
+    "webSearch": "op-provider,minimax-m2.5",
+    "image": "op-provider,kimi-k2.5"
+  }
+}
