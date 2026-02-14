@@ -1,3 +1,4 @@
 # iFlow Manager Dependencies
 colorama>=0.4.6
+requests>=2.31.0
 pyinstaller>=6.0.0
