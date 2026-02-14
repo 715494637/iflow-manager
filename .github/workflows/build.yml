@@ -57,7 +57,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller iFlowManager.spec --name ${{ env.APP_NAME }}
+        run: pyinstaller iFlowManager.spec
 
       - name: Create distributable package
         run: |
