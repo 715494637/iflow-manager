@@ -63,13 +63,13 @@ jobs:
         run: |
           mkdir -p release
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp dist/${{ env.APP_NAME }}/${{ env.APP_NAME }}.exe release/
+            cp dist/${{ env.APP_NAME }}.exe release/
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             cp -r dist/${{ env.APP_NAME }}.app release/
             cd release && zip -r iFlowManager-macos.zip iFlowManager.app
           else
             cp -r dist/${{ env.APP_NAME }} release/iFlowManager
-            tar -czvf iFlowManager-linux-x64.tar.gz iFlowManager
+            cd release && tar -czvf iFlowManager-linux-x64.tar.gz iFlowManager
           fi
 
       - name: Upload artifact
