@@ -30,7 +30,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller iFlowManager.spec
+        run: pyinstaller iFlowManager.spec --clean
 
       - name: Create distributable package
         shell: bash
@@ -62,7 +62,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller iFlowManager.spec
+        run: pyinstaller iFlowManager.spec --clean
 
       - name: Create distributable package
         run: |
@@ -99,7 +99,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller iFlowManager.spec
+        run: pyinstaller iFlowManager.spec --clean
 
       - name: Create distributable package
         run: |
