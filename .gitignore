@@ -28,7 +28,7 @@ ENV/
 env/
 
 # PyInstaller
-*.spec
+# *.spec  # 需要提交到 GitHub 用于 CI 构建
 
 # IDE
 .vscode/
