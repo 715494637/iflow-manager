@@ -1,0 +1,108 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  APP_NAME: 'iFlowManager'
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            runner: windows-latest
+            artifact_name: 'iFlowManager-win64'
+          - os: macos-latest
+            runner: macos-latest
+            artifact_name: 'iFlowManager-macos'
+          - os: ubuntu-latest
+            runner: ubuntu-latest
+            artifact_name: 'iFlowManager-linux'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-xinerama0 libxkbcommon-x11-0 libdbus-1-3
+        shell: bash
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install --cask xquartz
+        shell: bash
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller iFlowManager.spec --name ${{ env.APP_NAME }}
+
+      - name: Create distributable package
+        run: |
+          mkdir -p release
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp dist/${{ env.APP_NAME }}/${{ env.APP_NAME }}.exe release/
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            cp -r dist/${{ env.APP_NAME }}.app release/
+            cd release && zip -r iFlowManager-macos.zip iFlowManager.app
+          else
+            cp -r dist/${{ env.APP_NAME }} release/iFlowManager
+            tar -czvf iFlowManager-linux-x64.tar.gz iFlowManager
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            release/*
+          retention-days: 30
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/iFlowManager-win64/iFlowManager.exe
+            artifacts/iFlowManager-macos/iFlowManager-macos.zip
+            artifacts/iFlowManager-linux/iFlowManager-linux-x64.tar.gz
+          draft: false
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
